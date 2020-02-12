@@ -1,0 +1,6 @@
+{
+  "dependencies": {
+    "exit-hook": "^2.2.0",
+    "winston": "^3.2.1"
+  }
+}

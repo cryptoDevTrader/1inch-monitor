@@ -9,7 +9,7 @@ Monitors [1inch.exchange](https://1inch.exchange) price pairs via the [API](http
 - **API_VERSION** (default: `v1.1`) Sets the API version to use. The latest version should be documented at [API](https://1inch.exchange/#/api).
 - **TELEGRAM_BOT_TOKEN** (required) Sets the [Telegram Bot](https://core.telegram.org/bots#3-how-do-i-create-a-bot) token to use for sending notifications.
 - **TELEGRAM_CHAT_ID** (required) Sets the [Telegram chat id](https://stackoverflow.com/a/32572159/882223) to use for sending notifications.
-- **RULES** (requied) Defines rules to be used for alerting. More information below. New line separated.
+- **RULES** (required) Defines rules to be used for alerting. More information below. New line separated.
 
 ### Rules
 Rules are defined as follows.

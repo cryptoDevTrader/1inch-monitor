@@ -28,7 +28,7 @@ docker run \
 -e TELEGRAM_CHAT_ID=CHANGEME \
 -e RULES='1 USDC >= 1.01 DAI !0X Relays \
 1 DAI >= 1.01 USDC !OX Relays,Uniswap,Kyber \
- ETH >= 250 USDC !AirSwap,Kyber,Uniswap \
+1 ETH >= 250 USDC !AirSwap,Kyber,Uniswap \
 250 DAI <= 1 ETH' \
 divthis/1inch-monitor
 ```

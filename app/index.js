@@ -62,8 +62,6 @@ const sendNotification = (text, cb) => {
 		res.on("end", () => {
 			const body = Buffer.concat(chunks);
 
-			log.http(body.toString());
-
 			if (cb != null) {
 				cb(JSON.parse(body));
 			}
@@ -87,6 +85,8 @@ const checkPrice = (fromTokenSymbol, toTokenSymbol, amount, disableExchangeList,
 	};
 
 	const url = quote_url + '?' + querystring.stringify(params);
+
+	log.http(url);
 
 	https.get(url, (res) => {
 		const chunks = [];

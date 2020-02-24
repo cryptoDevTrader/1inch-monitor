@@ -47,8 +47,6 @@ const telegram_bot_url = `https://api.telegram.org/bot${process.env.TELEGRAM_BOT
 const quote_url = `https://api.1inch.exchange/${api_version}/quote`;
 const tokens_url = `https://api.1inch.exchange/${api_version}/tokens`;
 
-let tokens;
-
 const sendNotification = (text, cb) => {
 	log.info(text);
 
@@ -111,7 +109,7 @@ const checkPrice = (fromTokenSymbol, toTokenSymbol, amount, disableExchangeList,
 			cb(null, e);
 		}
 	});
-}
+};
 
 const getTokens = (cb) => {
 	https.get(tokens_url, (res) => {
@@ -137,15 +135,9 @@ const getTokens = (cb) => {
 			cb(null, e);
 		}
 	});
-}
+};
 
-getTokens((body, error) => {
-	if (error != null) {
-		return;
-	}
-
-	tokens = body;
-
+const checkRules = (tokens) => {
 	// Ensure that "alerted" is set to false for all configs
 	rules.forEach(rule => {
 		rule.alerted = false;
@@ -210,4 +202,12 @@ getTokens((body, error) => {
 	exitHook(() => {
 		clearTimeout(timeout);
 	});
+};
+
+getTokens((body, error) => {
+	if (error != null) {
+		return;
+	}
+
+	checkRules(body);
 });

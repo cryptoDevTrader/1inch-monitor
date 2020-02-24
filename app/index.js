@@ -1,213 +1,76 @@
 'use strict';
 
-const https = require("https"),
-	  log = require('./logger'),
-	  exitHook = require('exit-hook'),
-	  querystring = require('querystring');
+import log from './modules/logger';
+import requireEnvs from './modules/require-envs';
+import Telegram from './modules/telegram';
+import OneInch from './modules/1inch';
+import RulesParser from './modules/rules-parser';
+import exitHook from 'exit-hook';
 
-const requiredEnvs = [
-	'TELEGRAM_BOT_TOKEN',
-	'TELEGRAM_CHAT_ID'
-];
+requireEnvs('TELEGRAM_BOT_TOKEN', 'TELEGRAM_CHAT_ID', 'RULES');
 
-const missingEnv = requiredEnvs.some((env) => {
-	if (process.env[env] === undefined) {
-		log.error('Missing required env variable: %s', env);
-		return true;
-	}
-});
+const interval = (parseInt(process.env.INTERVAL_SECONDS) || 1) * 1000,
+	  oneInch = new OneInch(process.env.API_VERSION || 'v1.1', true),
+	  telegram = new Telegram(process.env.TELEGRAM_BOT_TOKEN, process.env.TELEGRAM_CHAT_ID,),
+	  rulesParser = new RulesParser(),
+	  rules = rulesParser.parse(process.env.RULES);
 
-if (missingEnv) {
-	return;
-}
+let timeout,
+	i = 0;
 
-const regex = /^([0-9]*\.?[0-9]+)\s([A-Z]+)\s(>?<?=?)\s([0-9]*\.?[0-9]+)\s([A-Z]+)(?:\s!)?(.*)$/;
-const rules = process.env.RULES.split("\n").map(rule => {
-	const m = regex.exec(rule);
+const checkNext = () => {
+	const rule = rules[i];
 
-	if (m.length < 6 || m.length > 7) {
-		log.error(`Rule not recognized: ${rule}`);
-		return null;
-	}
+	log.info(`Checking if ${rule.rule}`);
 
-	return {
-		rule: rule,
-		fromTokenAmount: m[1],
-		fromTokenSymbol: m[2],
-		comparitor: m[3],
-		toTokenAmount: m[4],
-		toTokenSymbol: m[5],
-		disableExchangeList: m[6]
-	};
-}).filter(r => !!r);
-
-const interval = (parseInt(process.env.INTERVAL_SECONDS) || 1) * 1000;
-const api_version = process.env.API_VERSION || 'v1.1';
-const telegram_bot_url = `https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN}/sendMessage?chat_id=${process.env.TELEGRAM_CHAT_ID}&text=`;
-const quote_url = `https://api.1inch.exchange/${api_version}/quote`;
-const tokens_url = `https://api.1inch.exchange/${api_version}/tokens`;
-
-const sendNotification = (text, cb) => {
-	log.info(text);
-
-	https.get(telegram_bot_url + text, (res) => {
-		const chunks = [];
-
-		res.on("data", (chunk) => {
-			chunks.push(chunk);
-		});
-
-		res.on("end", () => {
-			const body = Buffer.concat(chunks);
-
-			if (cb != null) {
-				cb(JSON.parse(body));
-			}
-		});
-	}).on('error', (e) => {
-		log.error(e);
-
-		if (cb != null) {
-			cb(null, e);
+	oneInch.getQuote({
+		fromTokenSymbol: rule.fromTokenSymbol,
+		toTokenSymbol: rule.toTokenSymbol,
+		amount: rule.fromTokenAmount,
+		disableExchangeList: rule.disableExchangeList,
+		cb: new Date().getTime() // cache buster
+	}, (body, error) => {
+		if (error != null) {
+			log.error(`Error getting quote: ${error}`);
+			return;
 		}
-	});
-};
 
-const checkPrice = (fromTokenSymbol, toTokenSymbol, amount, disableExchangeList, cb) => {
-	const params = {
-		fromTokenSymbol: fromTokenSymbol,
-		toTokenSymbol: toTokenSymbol,
-		amount: amount,
-		disableExchangeList: disableExchangeList,
-		cb: new Date().getTime()
-	};
+		const rate = body.toTokenAmount / rule.fromTokenAmount;
 
-	const url = quote_url + '?' + querystring.stringify(params);
+		const message = `${rule.fromTokenAmount} ${rule.fromTokenSymbol} = ${body.toTokenAmount} ${rule.toTokenSymbol} (${rate})`;
 
-	log.http(url);
+		log.debug(message);
 
-	https.get(url, (res) => {
-		const chunks = [];
+		if (eval(`${body.toTokenAmount} ${rule.comparitor} ${rule.toTokenAmount}`)) {
+			if (!rule.alerted) {
+				telegram.sendNotification({
+					text: message
+				}, (body, error) => {
+					if (error != null) {
+						log.error(`Error sending notification: ${error}`);
+						return;
+					}
 
-		res.on("data", (chunk) => {
-			chunks.push(chunk);
-		});
-
-		res.on("end", () => {
-			const body = Buffer.concat(chunks);
-
-			log.http(body.toString());
-
-			if (cb != null) {
-				cb(JSON.parse(body));
+					rule.alerted = true;
+				});
 			}
-		});
-	}).on('error', (e) => {
-		log.error(e);
-
-		if (cb != null) {
-			cb(null, e);
+		} else {
+			rule.alerted = false;
 		}
-	});
-};
 
-const getTokens = (cb) => {
-	https.get(tokens_url, (res) => {
-		const chunks = [];
-
-		res.on("data", (chunk) => {
-			chunks.push(chunk);
-		});
-
-		res.on("end", () => {
-			const body = Buffer.concat(chunks);
-
-			log.http(body.toString());
-
-			if (cb != null) {
-				cb(JSON.parse(body));
-			}
-		});
-	}).on('error', (e) => {
-		log.error(e);
-
-		if (cb != null) {
-			cb(null, e);
+		if (i >= rules.length - 1) {
+			i = 0;
 		}
+		else {
+			i++;
+		}
+
+		timeout = setTimeout(checkNext, interval);
 	});
 };
 
-const checkRules = (tokens) => {
-	// Ensure that "alerted" is set to false for all configs
-	rules.forEach(rule => {
-		rule.alerted = false;
-	});
+checkNext();
 
-	let timeout;
-	let i = 0;
-
-	const checkNext = () => {
-		const rule = rules[i];
-	
-		[rule.fromTokenSymbol, rule.toTokenSymbol].forEach(symbol => {
-			if (!tokens.hasOwnProperty(symbol)) {
-				log.error(`Unknown token: ${symbol}`);
-				return;
-			}	
-		});
-
-		const fromTokenAmount = (rule.fromTokenAmount * parseFloat(`${10}e${tokens[rule.fromTokenSymbol].decimals}`)).toLocaleString('fullwide', {useGrouping: false});
-
-		log.info(`Checking if ${rule.rule}`);
-
-		checkPrice(rule.fromTokenSymbol, rule.toTokenSymbol, fromTokenAmount, rule.disableExchangeList, (body, error) => {
-			if (error != null) {
-				return;
-			}
-
-			const toAmount = body.toTokenAmount / parseFloat(`${10}e${tokens[rule.toTokenSymbol].decimals}`);
-			const rate = toAmount / rule.fromTokenAmount;
-
-			const message = `${rule.fromTokenAmount} ${rule.fromTokenSymbol} = ${toAmount} ${rule.toTokenSymbol} (${rate})`;
-
-			log.debug(message);
-
-			if (eval(`${toAmount} ${rule.comparitor} ${rule.toTokenAmount}`)) {
-				if (!rule.alerted) {
-					sendNotification(message, (body, error) => {
-						if (error != null) {
-							return;
-						}
-	
-						rule.alerted = true;
-					});
-				}
-			} else {
-				rule.alerted = false;
-			}
-
-			if (i >= rules.length - 1) {
-				i = 0;
-			}
-			else {
-				i++;
-			}
-
-			timeout = setTimeout(checkNext, interval);
-		});
-	}
-
-	checkNext();
-
-	exitHook(() => {
-		clearTimeout(timeout);
-	});
-};
-
-getTokens((body, error) => {
-	if (error != null) {
-		return;
-	}
-
-	checkRules(body);
+exitHook(() => {
+	clearTimeout(timeout);
 });

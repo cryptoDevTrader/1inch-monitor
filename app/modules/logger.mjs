@@ -1,6 +1,8 @@
 'use strict';
 
-const { createLogger, format, transports } = require('winston');
+import winston from'winston';
+
+const { createLogger, format, transports } = winston;
 const { combine, timestamp, colorize, printf, splat } = format;
 const log_level = process.env.LOG_LEVEL || 'info';
 
@@ -17,4 +19,4 @@ const logger = createLogger({
     transports: [new transports.Console()]
   });
 
-module.exports = logger;
+  export default logger;

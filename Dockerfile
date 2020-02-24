@@ -6,4 +6,4 @@ WORKDIR /usr/src/app
 ADD ./app/ ./
 RUN npm install --loglevel=error
 
-CMD ["node", "index.js"]
+CMD ["node", "-r", "esm", "index.js"]

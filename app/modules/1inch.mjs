@@ -14,6 +14,11 @@ class OneInch {
 		const _self = this;
 
 		this.api.get('tokens', null, (body, error) => {
+			if (body && body.message) {
+				cb.call(this.api, body, `${body.message}`);
+				return;
+			}
+
 			_self.tokens = body;
 			cb.call(this.api, body, error);
 		});
@@ -52,6 +57,11 @@ class OneInch {
 		}
 
 		this.api.get('quote', params, (body, error) => {
+			if (body && body.message) {
+				cb.call(this.api, body, `${body.message}`);
+				return;
+			}
+
 			if (_self.convertTokenAmounts) {
 				body.toTokenAmount = body.toTokenAmount / parseFloat(`${10}e${body.toToken.decimals}`);
 			}

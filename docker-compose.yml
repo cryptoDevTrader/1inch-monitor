@@ -7,7 +7,5 @@ services:
       TELEGRAM_BOT_TOKEN: CHANGEME
       TELEGRAM_CHAT_ID:  CHANGEME
       RULES: |-
-        1 USDC >= 1.01 DAI !0X Relays
-        1 DAI >= 1.01 USDC !OX Relays,Uniswap,Kyber
-        1 ETH >= 250 USDC !AirSwap,Kyber,Uniswap
-        250 DAI <= 1 ETH
+        1 USDC-ETH-USDC >= 1 !0X Relays
+        1 DAI-ETH-DAI >= 1

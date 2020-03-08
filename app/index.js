@@ -18,55 +18,71 @@ const interval = (parseInt(process.env.INTERVAL_SECONDS) || 1) * 1000,
 let timeout,
 	i = 0;
 
-const checkNext = () => {
+const getQuote = (params) => new Promise((resolve, reject) => {
+	oneInch.getQuote(params, (body, error) => {
+		if (error) {
+			log.error(`Error getting quote: ${error}`);
+			reject(error);
+			return;
+		}
+
+		resolve(body.toTokenAmount);
+	});
+});
+
+const checkNext = async () => {
 	const rule = rules[i];
 
 	log.info(`Checking if ${rule.rule}`);
 
-	oneInch.getQuote({
-		fromTokenSymbol: rule.fromTokenSymbol,
-		toTokenSymbol: rule.toTokenSymbol,
-		amount: rule.fromTokenAmount,
-		disableExchangeList: rule.disableExchangeList,
-		cb: new Date().getTime() // cache buster
-	}, (body, error) => {
-		if (error != null) {
-			log.error(`Error getting quote: ${error}`);
-			return;
+	const tokens = rule.tokenPath;
+	let amount = rule.fromTokenAmount;
+
+	for (let i = 0; i < tokens.length - 1; i++) {
+		const fromAmount = amount;
+		const fromTokenSymbol = tokens[i];
+		const toTokenSymbol = tokens[i+1];
+
+		amount = await getQuote({
+			fromTokenSymbol: fromTokenSymbol,
+			toTokenSymbol: toTokenSymbol,
+			amount: fromAmount,
+			disableExchangeList: rule.disableExchangeList
+		});
+
+		log.debug(`${fromAmount} ${fromTokenSymbol} = ${amount} ${toTokenSymbol}`);
+	}
+
+	const rate = amount / rule.fromTokenAmount;
+	const message = `${rule.fromTokenAmount} ${tokens.join('-')} = ${amount} (${rate})`;
+
+	log.debug(message);
+
+	if (eval(`${amount} ${rule.comparitor} ${rule.toTokenAmount}`)) {
+		if (!rule.alerted) {
+			telegram.sendNotification({
+				text: message
+			}, (body, error) => {
+				if (error != null) {
+					log.error(`Error sending notification: ${error}`);
+					return;
+				}
+
+				rule.alerted = true;
+			});
 		}
+	} else {
+		rule.alerted = false;
+	}
 
-		const rate = body.toTokenAmount / rule.fromTokenAmount;
+	if (i >= rules.length - 1) {
+		i = 0;
+	}
+	else {
+		i++;
+	}
 
-		const message = `${rule.fromTokenAmount} ${rule.fromTokenSymbol} = ${body.toTokenAmount} ${rule.toTokenSymbol} (${rate})`;
-
-		log.debug(message);
-
-		if (eval(`${body.toTokenAmount} ${rule.comparitor} ${rule.toTokenAmount}`)) {
-			if (!rule.alerted) {
-				telegram.sendNotification({
-					text: message
-				}, (body, error) => {
-					if (error != null) {
-						log.error(`Error sending notification: ${error}`);
-						return;
-					}
-
-					rule.alerted = true;
-				});
-			}
-		} else {
-			rule.alerted = false;
-		}
-
-		if (i >= rules.length - 1) {
-			i = 0;
-		}
-		else {
-			i++;
-		}
-
-		timeout = setTimeout(checkNext, interval);
-	});
+	timeout = setTimeout(checkNext, interval);
 };
 
 checkNext();

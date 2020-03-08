@@ -12,7 +12,7 @@ class RulesParser {
             const m = this.regex.exec(rule);
         
             if (m.length < 5 || m.length > 6) {
-                log.error(`Rule not recognized: ${rule}`);
+                log.error(`Rule not recognized: ${rule}: If you have recently upgraded, note that rules formatting has changed. Please see README for new format.`);
                 return null;
             }
         

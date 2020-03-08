@@ -9,7 +9,7 @@ import exitHook from 'exit-hook';
 
 requireEnvs('TELEGRAM_BOT_TOKEN', 'TELEGRAM_CHAT_ID', 'RULES');
 
-const interval = (parseInt(process.env.INTERVAL_SECONDS) || 1) * 1000,
+const interval = (parseInt(process.env.INTERVAL_SECONDS) || 10) * 1000,
 	  oneInch = new OneInch(process.env.API_VERSION || 'v1.1', true),
 	  telegram = new Telegram(process.env.TELEGRAM_BOT_TOKEN, process.env.TELEGRAM_CHAT_ID),
 	  rulesParser = new RulesParser(),

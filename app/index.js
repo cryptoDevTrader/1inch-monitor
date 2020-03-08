@@ -46,7 +46,7 @@ const getMultiPathQuote = (rule) => new Promise(async (resolve, reject) => {
 			amount: fromAmount,
 			disableExchangeList: rule.disableExchangeList
 		}).catch((error) => {
-			quoteError = `Error getting quote: ${fromAmount} ${fromTokenSymbol} = unknown ${toTokenSymbol}: ${error}`;
+			quoteError = `Error getting ${fromTokenSymbol}-${toTokenSymbol} quote: ${error}`;
 		});
 
 		if (quoteError) {

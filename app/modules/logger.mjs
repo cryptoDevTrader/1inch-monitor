@@ -1,6 +1,6 @@
 'use strict';
 
-import winston from'winston';
+import winston from 'winston';
 
 const { createLogger, format, transports } = winston;
 const { combine, timestamp, colorize, printf, splat } = format;

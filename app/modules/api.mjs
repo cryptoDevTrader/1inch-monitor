@@ -17,7 +17,7 @@ class APIRequest {
     get(path, params, cb) {
         const url = this.buildUrl(path, params);
 
-        log.http(url);
+        log.http(`GET ${url}`);
 
         get(url, (res) => {
             const chunks = [];

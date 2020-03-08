@@ -15,13 +15,11 @@ const interval = (parseInt(process.env.INTERVAL_SECONDS) || 1) * 1000,
 	  rulesParser = new RulesParser(),
 	  rules = rulesParser.parse(process.env.RULES);
 
-let timeout,
-	i = 0;
+let timeout;
 
 const getQuote = (params) => new Promise((resolve, reject) => {
 	oneInch.getQuote(params, (body, error) => {
 		if (error) {
-			log.error(`Error getting quote: ${error}`);
 			reject(error);
 			return;
 		}
@@ -30,13 +28,12 @@ const getQuote = (params) => new Promise((resolve, reject) => {
 	});
 });
 
-const checkNext = async () => {
-	const rule = rules[i];
-
-	log.info(`Checking if ${rule.rule}`);
+const getMultiPathQuote = (rule) => new Promise(async (resolve, reject) => {
+	log.debug(`Checking if ${rule.rule}`);
 
 	const tokens = rule.tokenPath;
 	let amount = rule.fromTokenAmount;
+	let quoteError;
 
 	for (let i = 0; i < tokens.length - 1; i++) {
 		const fromAmount = amount;
@@ -48,15 +45,26 @@ const checkNext = async () => {
 			toTokenSymbol: toTokenSymbol,
 			amount: fromAmount,
 			disableExchangeList: rule.disableExchangeList
+		}).catch((error) => {
+			quoteError = `Error getting quote: ${fromAmount} ${fromTokenSymbol} = unknown ${toTokenSymbol}: ${error}`;
 		});
 
+		if (quoteError) {
+			break;
+		}
+
 		log.debug(`${fromAmount} ${fromTokenSymbol} = ${amount} ${toTokenSymbol}`);
+	}
+
+	if (quoteError) {
+		reject(quoteError);
+		return;
 	}
 
 	const rate = amount / rule.fromTokenAmount;
 	const message = `${rule.fromTokenAmount} ${tokens.join('-')} = ${amount} (${rate})`;
 
-	log.debug(message);
+	log.info(message);
 
 	if (eval(`${amount} ${rule.comparitor} ${rule.toTokenAmount}`)) {
 		if (!rule.alerted) {
@@ -64,28 +72,34 @@ const checkNext = async () => {
 				text: message
 			}, (body, error) => {
 				if (error != null) {
-					log.error(`Error sending notification: ${error}`);
+					reject(`Error sending notification: ${error}`);
 					return;
 				}
 
 				rule.alerted = true;
+				resolve();
 			});
 		}
 	} else {
 		rule.alerted = false;
+		resolve();
 	}
+});
 
-	if (i >= rules.length - 1) {
-		i = 0;
-	}
-	else {
-		i++;
-	}
+const checkAll = async () => {
+	const quotes = rules.map((rule) => {
+		return getMultiPathQuote(rule).catch((error) => {
+			log.error(error);
+		});
+	});
 
-	timeout = setTimeout(checkNext, interval);
+	Promise.all(quotes).finally(() => {
+		timeout = setTimeout(checkAll, interval);
+	});
 };
 
-checkNext();
+log.debug('Getting tokens');
+oneInch.getTokens(checkAll);
 
 exitHook(() => {
 	clearTimeout(timeout);

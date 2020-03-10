@@ -5,8 +5,11 @@ import { stringify } from 'querystring';
 import log from './logger';
 
 class APIRequest {
-	constructor(baseUrl) {
+	constructor(baseUrl, maxInFlight) {
         this.baseUrl = baseUrl;
+        this.maxInFlight = maxInFlight || 100;
+        this.inFlight = 0;
+        this.queue = [];
     }
 
     buildUrl(path, params) {
@@ -14,10 +17,23 @@ class APIRequest {
         return `${this.baseUrl}/${path}${query == '' ? '' : '?' + query}`;
     }
 
-    get(path, params, cb) {
-        const url = this.buildUrl(path, params);
+    _getNext() {
+        if (this.inFlight >= this.maxInFlight) {
+            return;
+        }
+
+        if (this.queue.length == 0) {
+            return;
+        }
+
+        this.inFlight++;
+
+        const _self = this;
+        const req = this.queue.shift();
+        const url = this.buildUrl(req.path, req.params);
 
         log.http(`GET ${url}`);
+        log.debug(`Requests: inFlight[${this.inFlight}] queue[${this.queue.length}]`);
 
         get(url, (res) => {
             const chunks = [];
@@ -27,6 +43,9 @@ class APIRequest {
             });
     
             res.on("end", () => {
+                _self.inFlight--;
+                _self._getNext();
+
                 const body = Buffer.concat(chunks);
 
                 let e;
@@ -35,19 +54,32 @@ class APIRequest {
                     e = res.statusMessage;
                 }
     
-                if (cb) {
-                    cb(JSON.parse(body), e);
+                if (req.cb) {
+                    req.cb(JSON.parse(body), e);
                 } else if (e) {
                     log.error(e);
                 }
             });
         }).on('error', (e) => {
-            if (cb) {
-                cb(null, e);
+            _self.inFlight--;
+            _self._getNext();
+
+            if (req.cb) {
+                req.cb(null, e);
             } else if (e) {
                 log.error(e);
             }
         });
+    }
+
+    get(path, params, cb) {
+        this.queue.push({
+            path: path,
+            params: params,
+            cb: cb
+        });
+
+        this._getNext();
     }
 }
 

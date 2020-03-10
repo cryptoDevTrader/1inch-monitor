@@ -7,6 +7,7 @@ Monitors [1inch.exchange](https://1inch.exchange) price pairs via the [API](http
 - **LOG_LEVEL** (default: `info`) Sets the log level. Available log levels are `silly|debug|verbose|http|info|warn|error`.
 - **INTERVAL_SECONDS** (default: `10`) Sets the number of seconds to wait between checks for all rules. All rules will are checked in parallel and the next check occurs after the interval.
 - **API_VERSION** (default: `v1.1`) Sets the API version to use. The latest version should be documented at [API](https://1inch.exchange/#/api).
+- **MAX_INFLIGHT** (default: `3`) Maximum in-flight 1inch API requests.
 - **TELEGRAM_BOT_TOKEN** (required) Sets the [Telegram Bot](https://core.telegram.org/bots#3-how-do-i-create-a-bot) token to use for sending notifications.
 - **TELEGRAM_CHAT_ID** (required) Sets the [Telegram chat id](https://stackoverflow.com/a/32572159/882223) to use for sending notifications.
 - **RULES** (required) Defines rules to be used for alerting. More information below. New line separated.

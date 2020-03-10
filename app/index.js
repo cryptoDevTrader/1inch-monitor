@@ -10,7 +10,8 @@ import exitHook from 'exit-hook';
 requireEnvs('TELEGRAM_BOT_TOKEN', 'TELEGRAM_CHAT_ID', 'RULES');
 
 const interval = (parseInt(process.env.INTERVAL_SECONDS) || 10) * 1000,
-	  oneInch = new OneInch(process.env.API_VERSION || 'v1.1', true),
+	  maxInFlight = parseInt(process.env.MAX_INFLIGHT) || 3,
+	  oneInch = new OneInch(process.env.API_VERSION || 'v1.1', maxInFlight, true),
 	  telegram = new Telegram(process.env.TELEGRAM_BOT_TOKEN, process.env.TELEGRAM_CHAT_ID),
 	  rulesParser = new RulesParser(),
 	  rules = rulesParser.parse(process.env.RULES);
@@ -86,7 +87,12 @@ const getMultiPathQuote = (rule) => new Promise(async (resolve, reject) => {
 	}
 });
 
-const checkAll = async () => {
+const checkAll = async (body, error) => {
+	if (error) {
+		getTokensFirst();
+		return;
+	}
+
 	const quotes = rules.map((rule) => {
 		return getMultiPathQuote(rule).catch((error) => {
 			log.error(error);
@@ -98,8 +104,12 @@ const checkAll = async () => {
 	});
 };
 
+const getTokensFirst = () => {
+	oneInch.getTokens(checkAll);
+};
+
 log.debug('Getting tokens');
-oneInch.getTokens(checkAll);
+getTokensFirst();
 
 exitHook(() => {
 	clearTimeout(timeout);

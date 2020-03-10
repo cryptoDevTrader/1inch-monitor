@@ -4,10 +4,10 @@ import API from './api';
 import log from './logger';
 
 class OneInch {
-	constructor(apiVersion, convertTokenAmounts) {
+	constructor(apiVersion, maxInFlight, convertTokenAmounts) {
 		this.tokens = null;
 		this.convertTokenAmounts = convertTokenAmounts == null ? false : convertTokenAmounts;
-		this.api = new API(`https://api.1inch.exchange/${apiVersion}`);
+		this.api = new API(`https://api.1inch.exchange/${apiVersion}`, maxInFlight);
 	}
 
 	getTokens(cb) {

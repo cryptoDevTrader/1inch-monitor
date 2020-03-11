@@ -55,7 +55,16 @@ class APIRequest {
                 }
     
                 if (req.cb) {
-                    req.cb(JSON.parse(body), e);
+                    let obj;
+                    let error = e;
+
+                    try {
+                        obj = JSON.parse(body);
+                    } catch (e) {
+                        error = e;
+                    } finally {
+                        req.cb(obj, error);
+                    }
                 } else if (e) {
                     log.error(e);
                 }

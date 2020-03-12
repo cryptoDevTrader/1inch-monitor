@@ -62,6 +62,11 @@ class OneInch {
 				return;
 			}
 
+			if (error) {
+				cb.call(this.api, body, error);
+				return;
+			}
+
 			if (_self.convertTokenAmounts) {
 				body.toTokenAmount = body.toTokenAmount / parseFloat(`${10}e${body.toToken.decimals}`);
 			}

@@ -15,7 +15,7 @@ class RulesParser {
                 log.error(`Rule not recognized: ${rule}: If you have recently upgraded, note that rules formatting has changed. Please see README for new format.`);
                 return null;
             }
-        
+
             return {
                 rule: rule,
                 alerted: false,

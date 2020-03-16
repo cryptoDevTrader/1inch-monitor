@@ -93,7 +93,7 @@ const checkAll = async (body, error) => {
 		return;
 	}
 
-	const quotes = rules.map((rule) => {
+	const quotes = rules.map(async (rule) => {
 		return getMultiPathQuote(rule).catch((error) => {
 			log.error(error);
 		});
@@ -112,5 +112,6 @@ log.debug('Getting tokens');
 getTokensFirst();
 
 exitHook(() => {
+	log.info('Shutting down');
 	clearTimeout(timeout);
 });

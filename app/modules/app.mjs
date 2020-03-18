@@ -2,7 +2,7 @@
 
 import log from './logger';
 
-class OneInchMonitor {
+class App {
     constructor(oneInch, telegram) {
         this.oneInch = oneInch;
         this.telegram = telegram;
@@ -135,4 +135,4 @@ class OneInchMonitor {
     }
 }
 
-export default OneInchMonitor;
+export default App;

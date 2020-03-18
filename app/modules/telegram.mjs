@@ -20,7 +20,7 @@ class Telegram {
             return;
         }
 
-        params.chat_id = this.defaultChatId;
+        params.chat_id = params.chat_id ? params.chat_id : this.defaultChatId;
 
         this.api.post('sendMessage', params, cb);
     }

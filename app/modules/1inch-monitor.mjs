@@ -1,7 +1,6 @@
 'use strict';
 
 import log from './logger';
-import exitHook from 'exit-hook';
 
 class OneInchMonitor {
     constructor(oneInch, telegram) {
@@ -9,10 +8,19 @@ class OneInchMonitor {
         this.telegram = telegram;
         this.timeout = null;
 
-		exitHook(() => {
-			log.info('Shutting down');
-			clearTimeout(this.timeout);
-		});
+        process.stdin.resume();
+
+        process.on('exit', this.close.bind(null, {cleanup: true}));
+        process.on('SIGINT', this.close.bind(null, {exit: true}));
+        process.on('SIGUSR1', this.close.bind(null, {exit: true}));
+        process.on('SIGUSR2', this.close.bind(null, {exit: true}));
+        process.on('uncaughtException', this.close.bind(null, {exit: true}));
+    }
+
+    close(options, exitCode) {
+        if (options.cleanup) clearTimeout(this.timeout);
+        if (exitCode || exitCode === 0) log.info(`Shutting down: ${exitCode}`);
+        if (options.exit) process.exit();
     }
 
     getQuote(params) {
@@ -84,6 +92,8 @@ class OneInchMonitor {
                         rule.alerted = true;
                         resolve();
                     });
+                } else {
+                    resolve();
                 }
             } else {
                 rule.alerted = false;
@@ -101,19 +111,27 @@ class OneInchMonitor {
                 return;
             }
 
+            log.info('Checking rules');
+
             const quotes = rules.map(async (rule) => {
                 return _self.getMultiPathQuote(rule).catch((error) => {
                     log.error(error);
                 });
             });
-    
-            Promise.all(quotes).finally(() => {
+
+            Promise.all(quotes).catch((error) => {
+                log.error(error);
+            }).finally(() => {
+                clearTimeout(_self.timeout);
+
+                log.info(`Waiting ${interval / 1000} seconds until next check.`);
+
                 _self.timeout = setTimeout(checkAll, interval);
             });
         };
 
-        log.debug('Getting tokens');
-        return this.oneInch.getTokens(checkAll);
+        log.info('Getting tokens');
+        this.oneInch.getTokens(checkAll);
     }
 }
 

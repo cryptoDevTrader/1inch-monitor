@@ -1,6 +1,6 @@
 'use strict';
 
-import { get } from 'https';
+import { request } from 'https';
 import { stringify } from 'querystring';
 import log from './logger';
 
@@ -17,7 +17,7 @@ class APIRequest {
         return `${this.baseUrl}/${path}${query == '' ? '' : '?' + query}`;
     }
 
-    _getNext() {
+    _next() {
         if (this.inFlight >= this.maxInFlight) {
             return;
         }
@@ -30,12 +30,24 @@ class APIRequest {
 
         const _self = this;
         const req = this.queue.shift();
-        const url = this.buildUrl(req.path, req.params);
+        const url = this.buildUrl(req.path, req.method === 'GET' ? req.params : null);
+        const options = {
+            method: req.method
+        };
 
-        log.http(`GET ${url}`);
+        const query = stringify(req.params);
+
+        if (req.method === 'POST') {
+            options.headers = {
+                'Content-Type': 'application/x-www-form-urlencoded',
+                'Content-Length': Buffer.byteLength(query)
+            };
+        }
+
+        log.http(`${options.method} ${url}`);
         log.debug(`Requests: inFlight[${this.inFlight}] queue[${this.queue.length}]`);
 
-        get(url, (res) => {
+        const inflight = request(url, options, (res) => {
             const chunks = [];
     
             res.on("data", (chunk) => {
@@ -44,7 +56,7 @@ class APIRequest {
     
             res.on("end", () => {
                 _self.inFlight--;
-                _self._getNext();
+                _self._next();
 
                 const body = Buffer.concat(chunks);
 
@@ -71,7 +83,7 @@ class APIRequest {
             });
         }).on('error', (e) => {
             _self.inFlight--;
-            _self._getNext();
+            _self._next();
 
             if (req.cb) {
                 req.cb(null, e);
@@ -79,16 +91,34 @@ class APIRequest {
                 log.error(e);
             }
         });
+
+        if (req.method === 'POST') {
+            inflight.write(query);
+        }
+
+        inflight.end();
     }
 
     get(path, params, cb) {
         this.queue.push({
+            method: 'GET',
             path: path,
             params: params,
             cb: cb
         });
 
-        this._getNext();
+        this._next();
+    }
+
+    post(path, params, cb) {
+        this.queue.push({
+            method: 'POST',
+            path: path,
+            params: params,
+            cb: cb
+        });
+
+        this._next();
     }
 }
 

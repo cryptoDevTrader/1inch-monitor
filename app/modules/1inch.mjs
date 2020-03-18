@@ -25,6 +25,18 @@ class OneInch {
 	}
 
 	getQuote(params, cb) {
+		this.get('quote', params, cb);
+	}
+
+	getSwap(params, cb) {
+		this.get('swap', params, cb);
+	}
+
+	getSwapQuote(params, cb) {
+		this.get('swapQuote', params, cb);
+	}
+
+	get(type, params, cb) {
 		const _self = this;
 
 		if (this.tokens == null) {
@@ -33,17 +45,11 @@ class OneInch {
 					return;
 				}
 
-				_self._getQuote(params, cb);
+				_self.get(type, params, cb);
 			});
 
 			return;
 		}
-
-		this._getQuote(params, cb);
-	}
-
-	_getQuote(params, cb) {
-		const _self = this;
 
 		[params.fromTokenSymbol, params.toTokenSymbol].forEach(symbol => {
 			if (!_self.tokens.hasOwnProperty(symbol)) {
@@ -52,11 +58,11 @@ class OneInch {
 			}
 		});
 
-		if (this.convertTokenAmounts) {
+		if (this.convertTokenAmounts && params.amount) {
 			params.amount = (params.amount * parseFloat(`${10}e${this.tokens[params.fromTokenSymbol].decimals}`)).toLocaleString('fullwide', {useGrouping: false});
 		}
 
-		this.api.get('quote', params, (body, error) => {
+		this.api.get(type, params, (body, error) => {
 			if (body && body.message) {
 				cb.call(this.api, body, `${body.message}`);
 				return;
@@ -67,7 +73,7 @@ class OneInch {
 				return;
 			}
 
-			if (_self.convertTokenAmounts) {
+			if (_self.convertTokenAmounts && body && body.toTokenAmount && body.toToken.decimals) {
 				body.toTokenAmount = body.toTokenAmount / parseFloat(`${10}e${body.toToken.decimals}`);
 			}
 

@@ -23,7 +23,7 @@ class RulesParser {
                 tokenPath: m[2].split('-'),
                 comparitor: m[3],
                 toTokenAmount: m[4],
-                disableExchangeList: m[5]
+                disabledExchangeList: m[5]
             };
         }).filter(r => !!r);
     }

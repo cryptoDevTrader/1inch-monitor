@@ -10,10 +10,10 @@ class App {
 
         process.stdin.resume();
 
-        process.on('exit', this.close.bind(null, {cleanup: true}));
-        process.on('SIGINT', this.close.bind(null, {exit: true}));
-        process.on('SIGUSR1', this.close.bind(null, {exit: true}));
-        process.on('SIGUSR2', this.close.bind(null, {exit: true}));
+        process.on('exit', this.close.bind(this, {cleanup: true}));
+        process.on('SIGINT', this.close.bind(this, {exit: true}));
+        process.on('SIGUSR1', this.close.bind(this, {exit: true}));
+        process.on('SIGUSR2', this.close.bind(this, {exit: true}));
         process.on('uncaughtException', this.close.bind(null, {exit: true}));
     }
 

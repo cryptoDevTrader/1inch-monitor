@@ -57,7 +57,7 @@ class App {
                     fromTokenSymbol: fromTokenSymbol,
                     toTokenSymbol: toTokenSymbol,
                     amount: fromAmount,
-                    disableExchangeList: rule.disableExchangeList
+                    disabledExchangeList: rule.disabledExchangeList
                 }).catch((error) => {
                     quoteError = `Error getting ${fromTokenSymbol}-${toTokenSymbol} quote: ${error}`;
                 });

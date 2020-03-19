@@ -8,9 +8,11 @@ class RulesParser {
     }
 
     parse(rules) {
-        return rules.split("\n").map(rule => {
+        return rules.split("\n")
+        .sort()
+        .map(rule => {
             const m = this.regex.exec(rule);
-        
+
             if (m.length < 5 || m.length > 6) {
                 log.error(`Rule not recognized: ${rule}: If you have recently upgraded, note that rules formatting has changed. Please see README for new format.`);
                 return null;

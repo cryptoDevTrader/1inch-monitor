@@ -5,11 +5,14 @@ import { stringify } from 'querystring';
 import log from './logger';
 
 class APIRequest {
-	constructor(baseUrl, maxInFlight) {
+	constructor(baseUrl, maxInFlight, ttlCache) {
+        this.counter = 0;
         this.baseUrl = baseUrl;
         this.maxInFlight = maxInFlight || 100;
-        this.inFlight = 0;
+        this.ttlCache = ttlCache || 100;
         this.queue = [];
+        this.inFlight = [];
+        this.cache = [];
     }
 
     buildUrl(path, params) {
@@ -17,16 +20,47 @@ class APIRequest {
         return `${this.baseUrl}/${path}${query == '' ? '' : '?' + query}`;
     }
 
-    _next() {
-        if (this.inFlight >= this.maxInFlight) {
-            return;
-        }
+    _inFlight(url, options) {
+        this.inFlight.push({
+            url: url,
+            options: options
+        });
+    }
 
+    _getInFlight(url, options) {
+        return this.inFlight.find((i) => {
+            return i.url === url && JSON.stringify(i.options) === JSON.stringify(options);
+        });
+    }
+
+    _removeInFlight(url, options) {
+        this.inFlight = this.inFlight.filter((i) => {
+            return !(i.url === url && JSON.stringify(i.options) === JSON.stringify(options));
+        });
+    }
+
+    _cache(url, options, response) {
+        this.cache.push({
+            url: url,
+            options: options,
+            response: response,
+            timestamp: Date.now()
+        });
+    }
+
+    _getCached(url, options) {
+        // Remove old cached items
+        this.cache = this.cache.filter((i) => Date.now() - i.timestamp < this.ttlCache);
+
+        return this.cache.find((i) => {
+            return i.url === url && JSON.stringify(i.options) === JSON.stringify(options);
+        });
+    }
+
+    _next() {
         if (this.queue.length == 0) {
             return;
         }
-
-        this.inFlight++;
 
         const _self = this;
         const req = this.queue.shift();
@@ -44,10 +78,34 @@ class APIRequest {
             };
         }
 
-        log.http(`${options.method} ${url}`);
-        log.debug(`Requests: inFlight[${this.inFlight}] queue[${this.queue.length}]`);
+        const cache = this._getCached(url, options);
 
-        const inflight = request(url, options, (res) => {
+        if (cache && cache.response) {
+            log.debug('Returning from cache');
+
+            if (req.cb) {
+                req.cb(JSON.parse(cache.response), null);
+            }
+
+            _self._next();
+            return;
+        }
+
+        if (this.inFlight.length >= this.maxInFlight) {
+            return;
+        }
+
+        if (this._getInFlight(url, options)) {
+            this.queue.unshift(req);
+            return;
+        }
+
+        this._inFlight(url, options);
+
+        log.http(`${options.method} ${url}`);
+        log.debug(`Requests: count[${req.count}] inFlight[${this.inFlight.length}] queue[${this.queue.length}]`);
+
+        const inFlight = request(url, options, (res) => {
             const chunks = [];
     
             res.on("data", (chunk) => {
@@ -55,34 +113,38 @@ class APIRequest {
             });
     
             res.on("end", () => {
-                _self.inFlight--;
-                _self._next();
-
                 const body = Buffer.concat(chunks);
 
-                let e;
+                let obj,
+                    error;
 
                 if (res.statusCode >= 400) {
-                    e = res.statusMessage;
+                    error = res.statusMessage;
                 }
-    
-                if (req.cb) {
-                    let obj;
-                    let error = e;
 
+                if (!error) {
                     try {
                         obj = JSON.parse(body);
                     } catch (e) {
                         error = e;
-                    } finally {
-                        req.cb(obj, error);
                     }
-                } else if (e) {
-                    log.error(e);
+                }
+
+                if (!error && body) {
+                    _self._cache(url, options, body);
+                }
+
+                _self._removeInFlight(url, options);
+                _self._next();
+
+                if (req.cb) {
+                    req.cb(obj, error);
+                } else if (error) {
+                    log.error(error);
                 }
             });
         }).on('error', (e) => {
-            _self.inFlight--;
+            _self._removeInFlight(url, options);
             _self._next();
 
             if (req.cb) {
@@ -93,10 +155,10 @@ class APIRequest {
         });
 
         if (req.method === 'POST') {
-            inflight.write(query);
+            inFlight.write(query);
         }
 
-        inflight.end();
+        inFlight.end();
     }
 
     get(path, params, cb) {
@@ -104,9 +166,11 @@ class APIRequest {
             method: 'GET',
             path: path,
             params: params,
-            cb: cb
+            cb: cb,
+            count: this.counter
         });
 
+        this.counter++;
         this._next();
     }
 
@@ -115,9 +179,11 @@ class APIRequest {
             method: 'POST',
             path: path,
             params: params,
-            cb: cb
+            cb: cb,
+            count: this.counter
         });
 
+        this.counter++;
         this._next();
     }
 }

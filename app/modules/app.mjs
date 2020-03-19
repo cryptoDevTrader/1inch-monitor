@@ -107,6 +107,7 @@ class App {
 
         const checkAll = async (body, error) => {
             if (error) {
+                log.error(`Error getting tokens: ${error}`);
                 _self.monitor(rules, interval);
                 return;
             }

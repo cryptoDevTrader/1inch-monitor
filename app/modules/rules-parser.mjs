@@ -4,7 +4,7 @@ import log from './logger';
 
 class RulesParser {
     constructor(rules) {
-        this.regex = /^([0-9]*\.?[0-9]+)\s([A-Z\-]+)\s(>?<?=?)\s([0-9]*\.?[0-9]+)(?:\s!)?(.*)$/;
+        this.regex = /^([0-9]*\.?[0-9]+)\s([a-zA-Z\-]+)\s(>?<?=?)\s([0-9]*\.?[0-9]+)(?:\s!)?(.*)$/;
     }
 
     parse(rules) {

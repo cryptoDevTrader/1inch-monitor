@@ -22,6 +22,12 @@ Rules are defined as follows.
 
 Symbols are chained together via a hyphen.
 
+Gas alerting is also supported by using the following rule recipe where `speed` can be one of `SLOW`, `STANDARD`, `FAST`, or `INSTANT`.
+
+```
+<speed> GAS <comparitor> <amountToCompare>
+```
+
 ## Running
 
 ### Docker
@@ -33,7 +39,8 @@ docker run \
 -e RULES='1 USDC-DAI >= 1.01 !0X Relays \
 1 DAI-USDC >= 1.01 !OX Relays,Uniswap,Kyber \
 1 ETH-USDC >= 250 !AirSwap,Kyber,Uniswap \
-250 DAI-ETH <= 1' \
+250 DAI-ETH <= 1 \
+STANDARD GAS <= 10' \
 divthis/1inch-monitor
 ```
 
@@ -55,6 +62,7 @@ services:
         1 DAI-USDC >= 1.01 !OX Relays,Uniswap,Kyber
         1 ETH-USDC >= 250 !AirSwap,Kyber,Uniswap
         250 DAI-ETH <= 1
+        STANDARD GAS <= 10
 ```
 
 Run the following from the same directory as `docker-compose.yml`.

@@ -3,8 +3,9 @@
 import log from './logger';
 
 class App {
-    constructor(oneInch, telegram) {
+    constructor(oneInch, gasPrice, telegram) {
         this.oneInch = oneInch;
+        this.gasPrice = gasPrice;
         this.telegram = telegram;
         this.timeout = null;
 
@@ -38,6 +39,31 @@ class App {
         });
     }
 
+    getGasPrice(rule) {
+        const _self = this;
+        const speed = rule.fromTokenAmount.toLowerCase();
+
+        return new Promise(async (resolve, reject) => {
+            log.debug(`Checking if ${rule.rule}`);
+
+            await _self.gasPrice.get((body, error) => {
+                if (error) {
+                    reject(error);
+                    return;
+                }
+
+                const amount = body[speed];
+
+                if (!amount) {
+                    reject(`Unable to retrieve ${speed} speed.`);
+                    return;
+                }
+
+                resolve(amount);
+            });
+        });
+    }
+
     getMultiPathQuote(rule) {
         const _self = this;
 
@@ -48,25 +74,31 @@ class App {
             let amount = rule.fromTokenAmount;
             let quoteError;
 
-            for (let i = 0; i < tokens.length - 1; i++) {
-                const fromAmount = amount;
-                const fromTokenSymbol = tokens[i];
-                const toTokenSymbol = tokens[i+1];
-
-                amount = await _self.getQuote({
-                    fromTokenSymbol: fromTokenSymbol,
-                    toTokenSymbol: toTokenSymbol,
-                    amount: fromAmount,
-                    disabledExchangeList: rule.disabledExchangeList
-                }).catch((error) => {
-                    quoteError = `Error getting ${fromTokenSymbol}-${toTokenSymbol} quote: ${error}`;
+            if (rule.fromTokenAmount.match(/SLOW|STANDARD|FAST|INSTANT/i) && rule.tokenPath.includes('GAS')) {
+                amount = await _self.getGasPrice(rule).catch((error) => {
+                    quoteError = `Error getting GAS quote: ${error}`;
                 });
+            } else {
+                for (let i = 0; i < tokens.length - 1; i++) {
+                    const fromAmount = amount;
+                    const fromTokenSymbol = tokens[i];
+                    const toTokenSymbol = tokens[i+1];
 
-                if (quoteError) {
-                    break;
+                    amount = await _self.getQuote({
+                        fromTokenSymbol: fromTokenSymbol,
+                        toTokenSymbol: toTokenSymbol,
+                        amount: fromAmount,
+                        disabledExchangeList: rule.disabledExchangeList
+                    }).catch((error) => {
+                        quoteError = `Error getting ${fromTokenSymbol}-${toTokenSymbol} quote: ${error}`;
+                    });
+
+                    if (quoteError) {
+                        break;
+                    }
+
+                    log.debug(`${fromAmount} ${fromTokenSymbol} = ${amount} ${toTokenSymbol}`);
                 }
-
-                log.debug(`${fromAmount} ${fromTokenSymbol} = ${amount} ${toTokenSymbol}`);
             }
 
             if (quoteError) {
@@ -74,8 +106,8 @@ class App {
                 return;
             }
 
-            const rate = amount / rule.fromTokenAmount;
-            const message = `${rule.fromTokenAmount} ${tokens.join('-')} = ${amount} (${rate})`;
+            const rate = !isNaN(rule.fromTokenAmount) ? ` (${amount / rule.fromTokenAmount})` : '';
+            const message = `${rule.fromTokenAmount} ${tokens.join('-')} = ${amount}${rate}`;
 
             log.info(message);
 
@@ -88,7 +120,7 @@ class App {
                             reject(`Error sending notification: ${error}`);
                             return;
                         }
-        
+
                         rule.alerted = true;
                         resolve();
                     });

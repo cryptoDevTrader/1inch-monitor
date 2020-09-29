@@ -34,8 +34,8 @@ Gas alerting is also supported by using the following rule recipe where `speed` 
 ```shell
 docker run \
 --name 1inch-monitor \
--e TELEGRAM_BOT_TOKEN=CHANGEME \
--e TELEGRAM_CHAT_ID=CHANGEME \
+-e TELEGRAM_BOT_TOKEN=1234567890:ABCdefghi12345qazqazFAKEBOT \
+-e TELEGRAM_CHAT_ID=123456789 \
 -e RULES='1 USDC-DAI >= 1.01 !0X Relays \
 1 DAI-USDC >= 1.01 !OX Relays,Uniswap,Kyber \
 1 ETH-USDC >= 250 !AirSwap,Kyber,Uniswap \
